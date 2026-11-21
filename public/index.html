@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sunny Kitchen | Order Food Online & Book a Table</title>
+  <meta name="description" content="Fresh Indian food, delivered hot. Order online, book a table, and let our AI pick your meal." />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body data-page="home">
+
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <h1>Food that <span>brightens</span> your day.</h1>
+        <p>Fresh, hot and full of sunshine. Order online for delivery, or book a table and dine with us.</p>
+        <div class="hero-actions">
+          <a class="btn" href="/order.html">Order now</a>
+          <a class="btn btn-ghost" href="/booking.html">Book a table</a>
+        </div>
+        <div class="hero-badges">
+          <span>⚡ 30 min delivery</span>
+          <span>🥬 Fresh ingredients</span>
+          <span>⭐ Loved by locals</span>
+        </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">🍛</div>
+    </div>
+  </section>
+
+  <section class="section" id="suggester">
+    <div class="container">
+      <div class="ai-box">
+        <div>
+          <h2>What's your Sunny pick today?</h2>
+          <p class="section-sub">Not sure what to eat? Tell us your mood and our AI will pick a tasty combo from our menu.</p>
+          <form id="suggestForm">
+            <div class="field">
+              <label for="mood">Your mood or craving</label>
+              <input id="mood" maxlength="200" placeholder="e.g. tired, want something comforting" />
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="diet">Diet</label>
+                <select id="diet"><option value="any">Veg and non-veg</option><option value="veg">Vegetarian only</option></select>
+              </div>
+              <div class="field">
+                <label for="spice">Spice level</label>
+                <select id="spice"><option value="any">Any</option><option value="mild">Mild</option><option value="medium">Medium</option><option value="hot">Hot</option></select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="budget">Max price per dish (₹)</label>
+              <input id="budget" type="number" min="0" step="10" placeholder="No limit" />
+            </div>
+            <button class="btn" type="submit" id="suggestBtn">✨ Suggest my meal</button>
+          </form>
+        </div>
+        <div class="ai-results" id="aiResults">
+          <div class="ai-placeholder">Your suggestions will appear here ☀️</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <h2 class="section-title">Customer favourites</h2>
+      <p class="section-sub">The dishes our regulars keep coming back for.</p>
+      <div class="grid" id="popular"></div>
+      <p style="margin-top:24px"><a class="btn btn-ghost" href="/menu.html">See full menu</a></p>
+    </div>
+  </section>
+
+  <script src="/js/app.js"></script>
+  <script>
+    function dishCard(d) {
+      return `
+        <article class="dish">
+          <div class="dish-top"><span class="emoji">${esc(d.emoji)}</span><span class="diet ${d.veg ? '' : 'nonveg'}" title="${d.veg ? 'Vegetarian' : 'Non-vegetarian'}"></span></div>
+          <h3>${esc(d.name)}</h3>
+          <p>${esc(d.description)}</p>
+          <div class="dish-foot">
+            <div><span class="price">${rupee(d.price)}</span><br><span class="spice">${spiceLabel(d.spice)}</span></div>
+            <button class="btn btn-sm" data-id="${esc(d._id)}">Add</button>
+          </div>
+        </article>`;
+    }
+
+    let popularItems = [];
+    api('/api/menu?popular=1').then((items) => {
+      popularItems = items;
+      $('#popular').innerHTML = items.map(dishCard).join('') || '<p class="empty">Menu coming soon.</p>';
+    }).catch(() => { $('#popular').innerHTML = '<p class="empty">Could not load the menu.</p>'; });
+
+    $('#popular').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-id]');
+      if (!btn) return;
+      const dish = popularItems.find((d) => d._id === btn.dataset.id);
+      if (dish) addToCart(dish);
+    });
+
+    // AI suggester
+    let picks = [];
+    $('#suggestForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('#suggestBtn');
+      btn.disabled = true; btn.textContent = 'Thinking...';
+      $('#aiResults').innerHTML = '<div class="ai-placeholder">Finding your perfect meal...</div>';
+      try {
+        const data = await postJSON('/api/ai/suggest', {
+          mood: $('#mood').value, diet: $('#diet').value, spice: $('#spice').value, budget: $('#budget').value,
+        });
+        picks = data.picks.map((p) => p.item);
+        $('#aiResults').innerHTML = `<p class="ai-intro">${esc(data.intro)}</p>` + data.picks.map((p) => `
+          <div class="pick">
+            <span class="emoji">${esc(p.item.emoji)}</span>
+            <div><b>${esc(p.item.name)} · ${rupee(p.item.price)}</b><small>${esc(p.reason)}</small></div>
+            <button class="btn btn-sm" data-pick="${esc(p.item._id)}">Add</button>
+          </div>`).join('');
+      } catch (err) {
+        $('#aiResults').innerHTML = `<div class="ai-placeholder">${esc(err.message)}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = '✨ Suggest my meal';
+      }
+    });
+
+    $('#aiResults').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-pick]');
+      if (!btn) return;
+      const dish = picks.find((d) => d._id === btn.dataset.pick);
+      if (dish) addToCart(dish);
+    });
+  </script>
+</body>
+</html>

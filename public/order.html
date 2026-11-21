@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Order Online | Sunny Kitchen</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body data-page="order">
+
+  <section class="section">
+    <div class="container">
+      <h1 class="section-title">Your order</h1>
+      <p class="section-sub">Check your cart, add a coupon and tell us where to deliver. Free delivery above ₹500.</p>
+
+      <div class="order-layout">
+        <div class="form-card">
+          <h2 style="font-size:1.3rem">Cart</h2>
+          <div id="cartLines"></div>
+          <p style="margin-top:16px"><a class="btn btn-ghost btn-sm" href="/menu.html">+ Add more dishes</a></p>
+        </div>
+
+        <div class="form-card sticky">
+          <h2 style="font-size:1.3rem;margin-bottom:12px">Checkout</h2>
+          <form id="orderForm" novalidate>
+            <div class="field"><label for="name">Name</label><input id="name" required maxlength="80" /></div>
+            <div class="field"><label for="phone">Phone</label><input id="phone" type="tel" required maxlength="15" placeholder="98765 43210" /></div>
+            <div class="field"><label for="address">Delivery address</label><textarea id="address" rows="3" required maxlength="300"></textarea></div>
+            <div class="field">
+              <label for="payment">Payment</label>
+              <select id="payment"><option value="COD">Cash on delivery</option><option value="UPI">UPI on delivery</option></select>
+            </div>
+
+            <div class="coupon">
+              <input id="coupon" placeholder="Coupon code" maxlength="20" />
+              <button type="button" class="btn btn-sm" id="applyCoupon">Apply</button>
+            </div>
+            <div id="couponMsg"></div>
+
+            <div class="summary-row"><span>Subtotal</span><span id="sSub">₹0</span></div>
+            <div class="summary-row"><span>Discount</span><span id="sDisc">-₹0</span></div>
+            <div class="summary-row"><span>Delivery</span><span id="sDel">₹0</span></div>
+            <div class="summary-row total"><span>Total</span><span id="sTotal">₹0</span></div>
+
+            <button class="btn" type="submit" id="placeBtn" style="width:100%;margin-top:16px">Place order</button>
+            <div id="orderMsg"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="/js/app.js"></script>
+  <script>
+    const FREE_DELIVERY_ABOVE = 500, DELIVERY_FEE = 40;
+    let appliedOffer = null;
+
+    function calc() {
+      const subtotal = Cart.subtotal();
+      let discount = 0;
+      if (appliedOffer && subtotal >= appliedOffer.minOrder) {
+        discount = Math.round((subtotal * appliedOffer.discountPercent) / 100);
+        if (appliedOffer.maxDiscount > 0) discount = Math.min(discount, appliedOffer.maxDiscount);
+      }
+      const delivery = subtotal === 0 || subtotal >= FREE_DELIVERY_ABOVE ? 0 : DELIVERY_FEE;
+      return { subtotal, discount, delivery, total: subtotal - discount + delivery };
+    }
+
+    function renderCart() {
+      const items = Cart.get();
+      if (!items.length) {
+        $('#cartLines').innerHTML = '<p class="empty">Your cart is empty. <a href="/menu.html" style="color:var(--sun-deep);font-weight:700">Browse the menu</a></p>';
+      } else {
+        $('#cartLines').innerHTML = items.map((i) => `
+          <div class="cart-line">
+            <div><b>${esc(i.name)}</b><br><small style="color:var(--ink-soft)">${rupee(i.price)} each</small></div>
+            <div class="qty">
+              <button data-act="dec" data-id="${esc(i.id)}" aria-label="Decrease">−</button>
+              <span>${i.qty}</span>
+              <button data-act="inc" data-id="${esc(i.id)}" aria-label="Increase">+</button>
+            </div>
+            <b>${rupee(i.price * i.qty)}</b>
+          </div>`).join('');
+      }
+      const c = calc();
+      $('#sSub').textContent = rupee(c.subtotal);
+      $('#sDisc').textContent = '-' + rupee(c.discount);
+      $('#sDel').textContent = c.delivery ? rupee(c.delivery) : 'Free';
+      $('#sTotal').textContent = rupee(c.total);
+    }
+
+    $('#cartLines').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-act]');
+      if (!btn) return;
+      const item = Cart.get().find((i) => i.id === btn.dataset.id);
+      if (item) Cart.setQty(item.id, item.qty + (btn.dataset.act === 'inc' ? 1 : -1));
+    });
+    document.addEventListener('cart:changed', renderCart);
+
+    $('#applyCoupon').addEventListener('click', async () => {
+      const code = $('#coupon').value.trim();
+      const out = $('#couponMsg');
+      if (!code) return;
+      try {
+        const offer = await api('/api/offers/code/' + encodeURIComponent(code));
+        if (Cart.subtotal() < offer.minOrder) {
+          appliedOffer = null;
+          out.innerHTML = `<div class="msg err">${esc(offer.code)} needs a minimum order of ${rupee(offer.minOrder)}.</div>`;
+        } else {
+          appliedOffer = offer;
+          out.innerHTML = `<div class="msg ok">${esc(offer.code)} applied: ${offer.discountPercent}% off!</div>`;
+        }
+      } catch (err) {
+        appliedOffer = null;
+        out.innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+      }
+      renderCart();
+    });
+
+    $('#orderForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const out = $('#orderMsg');
+      const items = Cart.get();
+      if (!items.length) { out.innerHTML = '<div class="msg err">Your cart is empty.</div>'; return; }
+      const btn = $('#placeBtn');
+      btn.disabled = true; btn.textContent = 'Placing order...';
+      try {
+        const res = await postJSON('/api/orders', {
+          customerName: $('#name').value,
+          phone: $('#phone').value,
+          address: $('#address').value,
+          payment: $('#payment').value,
+          coupon: appliedOffer ? appliedOffer.code : '',
+          items: items.map((i) => ({ id: i.id, qty: i.qty })),
+        });
+        Cart.clear();
+        appliedOffer = null;
+        $('#orderForm').reset();
+        out.innerHTML = `<div class="msg ok">🎉 Order placed! Total ${rupee(res.total)}. Your order number is <b>${esc(String(res.orderId).slice(-6).toUpperCase())}</b>. We'll call you shortly.</div>`;
+        $('#couponMsg').innerHTML = '';
+      } catch (err) {
+        out.innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = 'Place order';
+      }
+    });
+
+    renderCart();
+
+    // If the customer is logged in, fill in their details for them
+    userReady.then((user) => {
+      if (!user) return;
+      if (!$('#name').value) $('#name').value = user.name;
+      if (!$('#phone').value) $('#phone').value = user.phone;
+    });
+  </script>
+</body>
+</html>

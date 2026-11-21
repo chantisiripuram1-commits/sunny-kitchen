@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Offers | Sunny Kitchen</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body data-page="offers">
+
+  <section class="section">
+    <div class="container">
+      <h1 class="section-title">Today's offers</h1>
+      <p class="section-sub">Tap a code to copy it, then paste it at checkout.</p>
+      <div class="grid" id="offers"></div>
+    </div>
+  </section>
+
+  <script src="/js/app.js"></script>
+  <script>
+    api('/api/offers').then((offers) => {
+      if (!offers.length) { $('#offers').innerHTML = '<p class="empty">No offers right now. Check back soon!</p>'; return; }
+      $('#offers').innerHTML = offers.map((o) => `
+        <article class="offer">
+          <div class="big">${o.discountPercent}% OFF</div>
+          <h3>${esc(o.title)}</h3>
+          <p>${esc(o.description)}</p>
+          <small>Min order ${rupee(o.minOrder)} · Valid till ${new Date(o.validTill).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</small>
+          <button class="code" data-code="${esc(o.code)}" title="Click to copy">${esc(o.code)}</button>
+          <a class="btn btn-sm" href="/menu.html" style="align-self:flex-start">Order now</a>
+        </article>`).join('');
+    }).catch(() => { $('#offers').innerHTML = '<p class="empty">Could not load offers.</p>'; });
+
+    $('#offers').addEventListener('click', async (e) => {
+      const btn = e.target.closest('.code');
+      if (!btn) return;
+      try { await navigator.clipboard.writeText(btn.dataset.code); toast(`Copied ${btn.dataset.code}`); }
+      catch { toast(`Your code: ${btn.dataset.code}`); }
+    });
+  </script>
+</body>
+</html>

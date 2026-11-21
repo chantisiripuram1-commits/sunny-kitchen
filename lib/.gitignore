@@ -1,0 +1,7 @@
+@'
+node_modules/
+.env
+.env.*
+!.env.example
+sunny-kitchen.zip
+'@ | Set-Content -Encoding utf8 .gitignore

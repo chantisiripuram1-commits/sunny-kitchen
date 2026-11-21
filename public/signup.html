@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign up | Sunny Kitchen</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body data-page="signup">
+
+  <section class="section">
+    <div class="container">
+      <div class="auth-wrap">
+        <h1>Create your account</h1>
+        <p class="section-sub">Sign up to order faster. We'll fill in your details at checkout.</p>
+
+        <form class="form-card" id="signupForm" novalidate>
+          <div class="field">
+            <label for="name">Full name</label>
+            <input id="name" autocomplete="name" required maxlength="80" />
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" type="email" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <label for="phone">Phone (optional)</label>
+            <input id="phone" type="tel" autocomplete="tel" maxlength="15" placeholder="98765 43210" />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="pw-wrap">
+              <input id="password" type="password" autocomplete="new-password" required minlength="8" maxlength="100" />
+              <button type="button" class="pw-toggle" data-target="password">Show</button>
+            </div>
+            <div class="hint">At least 8 characters.</div>
+          </div>
+          <div class="field">
+            <label for="confirm">Confirm password</label>
+            <input id="confirm" type="password" autocomplete="new-password" required maxlength="100" />
+          </div>
+          <button class="btn" type="submit" id="signupBtn" style="width:100%">Create account</button>
+          <div id="signupMsg"></div>
+        </form>
+
+        <p class="auth-switch">Already have an account? <a href="/login.html">Log in</a></p>
+      </div>
+    </div>
+  </section>
+
+  <script src="/js/app.js"></script>
+  <script>
+    // Show / hide password
+    $$('.pw-toggle').forEach((btn) => btn.addEventListener('click', () => {
+      const input = $('#' + btn.dataset.target);
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Hide' : 'Show';
+    }));
+
+    // Already logged in? Go home.
+    userReady.then((user) => { if (user) window.location.href = '/'; });
+
+    $('#signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const out = $('#signupMsg');
+      const btn = $('#signupBtn');
+
+      if ($('#password').value.length < 8) {
+        out.innerHTML = '<div class="msg err">Password must be at least 8 characters.</div>';
+        return;
+      }
+      if ($('#password').value !== $('#confirm').value) {
+        out.innerHTML = '<div class="msg err">The two passwords do not match.</div>';
+        return;
+      }
+
+      btn.disabled = true; btn.textContent = 'Creating account...';
+      try {
+        await postJSON('/api/auth/signup', {
+          name: $('#name').value,
+          email: $('#email').value,
+          phone: $('#phone').value,
+          password: $('#password').value,
+        });
+        out.innerHTML = '<div class="msg ok">🎉 Account created! Taking you to the menu...</div>';
+        setTimeout(() => (window.location.href = '/menu.html'), 900);
+      } catch (err) {
+        out.innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+        btn.disabled = false; btn.textContent = 'Create account';
+      }
+    });
+  </script>
+</body>
+</html>

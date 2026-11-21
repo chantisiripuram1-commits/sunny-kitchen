@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Log in | Sunny Kitchen</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body data-page="login">
+
+  <section class="section">
+    <div class="container">
+      <div class="auth-wrap">
+        <h1>Welcome back ☀️</h1>
+        <p class="section-sub">Log in to order faster.</p>
+
+        <form class="form-card" id="loginForm" novalidate>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" type="email" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="pw-wrap">
+              <input id="password" type="password" autocomplete="current-password" required maxlength="100" />
+              <button type="button" class="pw-toggle" data-target="password">Show</button>
+            </div>
+          </div>
+          <button class="btn" type="submit" id="loginBtn" style="width:100%">Log in</button>
+          <div id="loginMsg"></div>
+        </form>
+
+        <p class="auth-switch">New to Sunny Kitchen? <a href="/signup.html">Create an account</a></p>
+      </div>
+    </div>
+  </section>
+
+  <script src="/js/app.js"></script>
+  <script>
+    // Where to go after logging in (only paths on this site are allowed)
+    function nextPage() {
+      const next = new URLSearchParams(window.location.search).get('next') || '/';
+      return next.startsWith('/') && !next.startsWith('//') ? next : '/';
+    }
+
+    // Show / hide password
+    $$('.pw-toggle').forEach((btn) => btn.addEventListener('click', () => {
+      const input = $('#' + btn.dataset.target);
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Hide' : 'Show';
+    }));
+
+    // Already logged in? Go on.
+    userReady.then((user) => { if (user) window.location.href = nextPage(); });
+
+    $('#loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const out = $('#loginMsg');
+      const btn = $('#loginBtn');
+      btn.disabled = true; btn.textContent = 'Logging in...';
+      try {
+        await postJSON('/api/auth/login', { email: $('#email').value, password: $('#password').value });
+        out.innerHTML = '<div class="msg ok">✅ Logged in! Redirecting...</div>';
+        setTimeout(() => (window.location.href = nextPage()), 600);
+      } catch (err) {
+        out.innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+        btn.disabled = false; btn.textContent = 'Log in';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Book a Table | Sunny Kitchen</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body data-page="booking">
+
+  <section class="section">
+    <div class="container" style="max-width:640px">
+      <h1 class="section-title">Book a table</h1>
+      <p class="section-sub">Reserve your spot in a few seconds. We're open daily from 11:00 AM to 11:00 PM.</p>
+
+      <form class="form-card" id="bookingForm" novalidate>
+        <div class="row">
+          <div class="field"><label for="name">Name</label><input id="name" required maxlength="80" /></div>
+          <div class="field"><label for="phone">Phone</label><input id="phone" type="tel" required maxlength="15" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><label for="date">Date</label><input id="date" type="date" required /></div>
+          <div class="field"><label for="time">Time</label><select id="time" required></select></div>
+        </div>
+        <div class="field">
+          <label for="guests">Number of guests</label>
+          <select id="guests"></select>
+        </div>
+        <div class="field">
+          <label for="notes">Special requests (optional)</label>
+          <textarea id="notes" rows="3" maxlength="300" placeholder="Birthday, high chair, window seat..."></textarea>
+        </div>
+        <button class="btn" type="submit" id="bookBtn">Confirm booking</button>
+        <div id="bookMsg"></div>
+      </form>
+    </div>
+  </section>
+
+  <script src="/js/app.js"></script>
+  <script>
+    // today's date in local time (so past dates can't be picked)
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    $('#date').min = today;
+    $('#date').value = today;
+
+    // time slots every 30 minutes, 11:00 to 22:30
+    let slots = '';
+    for (let h = 11; h <= 22; h++) {
+      for (const m of ['00', '30']) {
+        const hour12 = h % 12 === 0 ? 12 : h % 12;
+        slots += `<option value="${pad(h)}:${m}">${hour12}:${m} ${h < 12 ? 'AM' : 'PM'}</option>`;
+      }
+    }
+    $('#time').innerHTML = slots;
+    $('#time').value = '19:00';
+
+    $('#guests').innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1} ${i ? 'guests' : 'guest'}</option>`).join('');
+    $('#guests').value = '2';
+
+    $('#bookingForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('#bookBtn');
+      const out = $('#bookMsg');
+      btn.disabled = true; btn.textContent = 'Booking...';
+      try {
+        const res = await postJSON('/api/bookings', {
+          name: $('#name').value, phone: $('#phone').value, date: $('#date').value,
+          time: $('#time').value, guests: $('#guests').value, notes: $('#notes').value,
+        });
+        out.innerHTML = `<div class="msg ok">✅ ${esc(res.message)} See you soon!</div>`;
+        $('#bookingForm').reset();
+        $('#date').value = today; $('#time').value = '19:00'; $('#guests').value = '2';
+      } catch (err) {
+        out.innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = 'Confirm booking';
+      }
+    });
+  </script>
+</body>
+</html>
